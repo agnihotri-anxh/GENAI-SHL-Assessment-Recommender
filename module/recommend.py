@@ -1,34 +1,42 @@
-import faiss
-import pickle
-import numpy as np
-from sentence_transformers import SentenceTransformer
+import pandas as pd
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from langchain_community.vectorstores import FAISS
+
+df = pd.read_csv("data/shl_assessments.csv")
+
+df["description"] = df["description"].fillna("No description available.")
+df["duration_minutes"] = df["duration_minutes"].fillna("Unknown")
+df["test_type"] = df["test_type"].fillna("General")
+
+df["combined_text"] = (
+    "Assessment: " + df["assessment_name"] + ". "
+    "Type: " + df["test_type"].astype(str) + ". "
+    "Duration: " + df["duration_minutes"].astype(str) + " minutes. "
+    "Description: " + df["description"]
+)
+
+texts = df["combined_text"].tolist()
+metadatas = df.to_dict("records")
+
+embedding = SentenceTransformerEmbeddings(model_name="all-mpnet-base-v2")
+vectorstore = FAISS.from_texts(texts=texts, embedding=embedding, metadatas=metadatas)
 
 
-index = faiss.read_index("shl_faiss.index")
-print(f"Index dimension: {index.d}")
-with open("shl_metadata.pkl", "rb") as f:
-    metadata = pickle.load(f)
-
-model = SentenceTransformer("all-mpnet-base-v2")
-print(f"Model dimension: {model.get_sentence_embedding_dimension()}")
-
-
-def recommend(query, top_k=5):
+def recommend(query: str, top_k: int = 5):
     """
-    Encodes the user query and searches the FAISS index for the
-    most semantically similar assessments.
+    LangChain-based recommendation:
+    - SentenceTransformerEmbeddings via LangChain
+    - FAISS vector store from langchain_community
+    - similarity_search_with_score for top-K retrieval
     """
-    query_embedding = model.encode([query], normalize_embeddings=True)
-    query_embedding = np.array(query_embedding).astype("float32")
-
-    scores, indices = index.search(query_embedding, top_k)
+    docs_and_scores = vectorstore.similarity_search_with_score(query, k=top_k)
 
     results = []
-    for i, idx in enumerate(indices[0]):
-        item = metadata[idx]
+    for doc, score in docs_and_scores:
+        item = doc.metadata
         results.append(
             {
-                "score": float(scores[0][i]),
+                "score": float(score),
                 "name": item["assessment_name"],
                 "url": item["assessment_url"],
                 "type": item.get("test_type", "N/A"),
@@ -44,15 +52,12 @@ def recommend(query, top_k=5):
 
 
 if __name__ == "__main__":
-    user_query = "Hiring a Java developer with good communication skills"
-    
-    print(f"\nSearching for: '{user_query}'")
-    print("-" * 50)
-    
-    recommendations = recommend(user_query, top_k=5)
-    
-    for i, r in enumerate(recommendations, 1):
-        print(f"{i}. {r['name']} (Match: {r['score']:.2f})")
+    q = "I am hiring for Java developers who can also collaborate effectively with my business teams."
+    recs = recommend(q, top_k=5)
+    for i, r in enumerate(recs, 1):
+        print(f"{i}. {r['name']} (score: {r['score']:.4f})")
         print(f"   Type: {r['type']} | Duration: {r['duration']} mins")
         print(f"   Link: {r['url']}")
         print(f"   Snippet: {r['description']}\n")
+
+

@@ -9,9 +9,8 @@ This project recommends the most relevant individual tests given a natural-langu
 ## 2. Approach (High-level)
 - Scrape SHL **Individual Test Solutions** into `data/shl_assessments.csv`
 - Build an enriched text field (name + description + duration + test type)
-- Encode assessments with **Sentence Transformers** (`all-mpnet-base-v2`)
-- Index embeddings with **FAISS** for fast similarity search
-- At query time: expand query (WordNet) → embed → retrieve top‑K from FAISS
+- Use **LangChain** with `SentenceTransformerEmbeddings` (`all-mpnet-base-v2`) and `FAISS` vector store for retrieval
+- At query time: expand query (WordNet) → LangChain similarity search over FAISS → return top‑K assessments
 - Evaluate with **Mean Recall@10** on a small labeled set
 
 ## 3. Architecture
@@ -52,6 +51,6 @@ Recall is limited by the **catalog metadata**: SHL pages describe assessments (s
 
 ## 6. Future Improvements
 - Role-based tagging / ontology over SHL assessments
-- LLM-based re-ranking on top of FAISS candidates
+- LLM-based re-ranking on top of FAISS candidates (e.g., GPT/Gemini reranker over top 20–50 hits)
 - Better use of metadata (duration, test type mix) in ranking
 - Human-in-the-loop feedback from recruiters

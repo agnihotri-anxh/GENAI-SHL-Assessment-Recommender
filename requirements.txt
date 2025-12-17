@@ -8,3 +8,5 @@ fastapi
 uvicorn 
 streamlit
 nltk
+langchain
+langchain-community
