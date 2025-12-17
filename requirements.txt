@@ -1,0 +1,10 @@
+pandas 
+requests 
+beautifulsoup4 
+tqdm
+sentence-transformers 
+faiss-cpu
+fastapi 
+uvicorn 
+streamlit
+nltk
