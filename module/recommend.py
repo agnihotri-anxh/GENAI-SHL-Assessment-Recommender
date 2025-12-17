@@ -3,31 +3,43 @@ import pickle
 import numpy as np
 from sentence_transformers import SentenceTransformer
 
+# Lazy loading: only load model/index when first request comes in
+# This reduces startup memory usage for Render deployment
+_index = None
+_metadata = None
+_model = None
 
-# Load precomputed FAISS index and metadata (built via module/build_index.py)
-index = faiss.read_index("shl_faiss.index")
-print(f"Index dimension: {index.d}")
-with open("shl_metadata.pkl", "rb") as f:
-    metadata = pickle.load(f)
 
-# Use the same encoder model that was used to build the index.
-model = SentenceTransformer("all-mpnet-base-v2")
-print(f"Model dimension: {model.get_sentence_embedding_dimension()}")
+def _ensure_loaded():
+    """Load FAISS index, metadata, and model on first call."""
+    global _index, _metadata, _model
+    if _index is None:
+        _index = faiss.read_index("shl_faiss.index")
+        print(f"Index dimension: {_index.d}")
+    if _metadata is None:
+        with open("shl_metadata.pkl", "rb") as f:
+            _metadata = pickle.load(f)
+    if _model is None:
+        _model = SentenceTransformer("all-mpnet-base-v2")
+        print(f"Model dimension: {_model.get_sentence_embedding_dimension()}")
 
 
 def recommend(query, top_k=5):
     """
     Encodes the user query and searches the FAISS index for the
     most semantically similar assessments.
+    Uses lazy loading to reduce startup memory.
     """
-    query_embedding = model.encode([query], normalize_embeddings=True)
+    _ensure_loaded()
+    
+    query_embedding = _model.encode([query], normalize_embeddings=True)
     query_embedding = np.array(query_embedding).astype("float32")
 
-    scores, indices = index.search(query_embedding, top_k)
+    scores, indices = _index.search(query_embedding, top_k)
 
     results = []
     for i, idx in enumerate(indices[0]):
-        item = metadata[idx]
+        item = _metadata[idx]
         results.append(
             {
                 "score": float(scores[0][i]),
