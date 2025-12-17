@@ -2,6 +2,8 @@ import pandas as pd
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from langchain_community.vectorstores import FAISS
 
+
+# Load catalog and build LangChain vector store.
 df = pd.read_csv("data/shl_assessments.csv")
 
 df["description"] = df["description"].fillna("No description available.")
@@ -18,7 +20,13 @@ df["combined_text"] = (
 texts = df["combined_text"].tolist()
 metadatas = df.to_dict("records")
 
-embedding = SentenceTransformerEmbeddings(model_name="all-mpnet-base-v2")
+# Use a lighter model for deployment to avoid OOM on small instances.
+# This still uses Sentence Transformers via LangChain, but with a
+# much smaller footprint than all-mpnet-base-v2.
+embedding = SentenceTransformerEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2",
+    model_kwargs={"device": "cpu"},
+)
 vectorstore = FAISS.from_texts(texts=texts, embedding=embedding, metadatas=metadatas)
 
 
